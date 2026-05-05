@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: selenium-hub
+  name: selenium-hub
+  namespace: custom-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: selenium-hub
+  template:
+    metadata:
+      labels:
+        app: selenium-hub
+    spec:
+      containers:
+      - env:
+        - name: GRID_HUB_PASSWORD
+          value: selenium-admin-2024
+        - valueFrom:
+            secretKeyRef:
+              key: database-url
+              name: selenium-hub-credentials
+        image: nginx@sha256:digest_value
+        livenessProbe:
+          httpGet:
+            path: /wd/hub/status
+            port: 4444
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        name: selenium-hub
+        ports:
+        - containerPort: 4444
+        - containerPort: 4443
+        - containerPort: 4442
+        - containerPort: 65000
+        readinessProbe:
+          httpGet:
+            path: /wd/hub/status
+            port: 4444
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: '.5'
+            memory: 1000Mi
+        securityContext:
+          seccompProfile:
+            type: docker/default
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: selenium-hub
+  name: selenium-hub
+  namespace: custom-namespace
+spec:
+  ports:
+  - name: port0
+    port: 4444
+    targetPort: 4444
+  - name: port1
+    port: 4443
+    targetPort: 4443
+  - name: port2
+    port: 4442
+    targetPort: 4442
+  selector:
+    app: sellenium-hub
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+data:
+  database-url: cG9zdGdyZXM6Ly91c2VyOnBhc3NAbG9jYWxob3N0L3NlbGVuaXVt
+kind: Secret
+metadata:
+  name: selenium-hub-credentials
+type: Opaque

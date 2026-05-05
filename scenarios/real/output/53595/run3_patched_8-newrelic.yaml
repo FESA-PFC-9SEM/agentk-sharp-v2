@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: newrelic-agent
+    tier: monitoring
+    version: v1
+  name: newrelic-agent
+spec:
+  selector:
+    matchLabels:
+      name: newrelic
+  template:
+    metadata:
+      labels:
+        name: newrelic
+    spec:
+      containers:
+      - args:
+        - echo 'Container iniciado e em execução...'; while true; do sleep 3600; done
+        command:
+        - /bin/sh
+        - -c
+        - --
+        - echo 'Container iniciado e em execução...' && nrsysmond
+        env:
+        - name: NRSYSMOND_logfile
+          value: /var/log/nrsysmond.log
+        - name: NEW_RELIC_LICENSE_KEY
+          value: abc123def456ghi789jkl
+        - name: API_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: api-secret-key
+              name: newrelic-secrets
+        image: newrelic/infrastructure@sha256:exampledigest
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - curl -f http://localhost:8080/health
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: newrelic
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 0.5
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - NET_RAW
+        volumeMounts:
+        - mountPath: /etc/kube-newrelic
+          name: newrelic-config
+          readOnly: true
+        - mountPath: /dev
+          name: dev
+        - mountPath: /var/run/docker.sock
+          name: run
+        - mountPath: /sys
+          name: sys
+        - mountPath: /var/log
+          name: log
+      containers[*]:
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            memory: 256Mi
+      hostIPC: false
+      hostNetwork: false
+      hostPID: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - hostPath:
+          path: /dev
+        name: dev
+      - hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+        name: run
+      - hostPath:
+          path: /sys
+        name: sys
+      - hostPath:
+          path: /var/log
+        name: log

@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: custom-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-app
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: guestbook
+        tier: frontend
+    spec:
+      containers:
+      - env:
+        - name: GET_HOSTS_FROM
+          value: dns
+        - valueFrom:
+            secretKeyRef:
+              key: password-service-host
+              name: frontend-credentials
+        image: nginx@sha256:<digest>
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: php-redis
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          seccompProfile:
+            type: docker/default
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+---
+apiVersion: v1
+data:
+  password-service-host: MTIzNDU2
+kind: Secret
+metadata:
+  name: frontend-credentials
+type: Opaque

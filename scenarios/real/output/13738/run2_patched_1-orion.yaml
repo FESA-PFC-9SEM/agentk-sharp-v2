@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fiware-orionld
+  namespace: custom-namespace
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: orionld
+  template:
+    metadata:
+      labels:
+        app: orionld
+      name: fiware-orion
+    spec:
+      containers:
+      - args:
+        - -dbhost
+        - orionld-mongodb-svc:27017
+        - -rplSet
+        - orionld-mongodb
+        - -dbuser
+        - usuariozão
+        - -dbpwd
+        - '123456789'
+        - -dbAuthMech
+        - SCRAM-SHA-256
+        - -db
+        - orion
+        - -statCounters
+        - -statSemWait
+        - -statTiming
+        - -statNotifQueue
+        automountServiceAccountToken: false
+        env:
+        - name: ORIONLD_MONGOCONLY
+          value: 'TRUE'
+        - valueFrom:
+            secretKeyRef:
+              key: db-password
+              name: fiware-orionld-credentials
+        - valueFrom:
+            secretKeyRef:
+              key: api-key
+              name: fiware-orionld-credentials
+        image: docker.io/fiware/orion-ld@sha256:exampledigest
+        livenessProbe:
+          httpGet:
+            path: /version
+            port: 1026
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        name: orion
+        ports:
+        - containerPort: 1026
+        readinessProbe:
+          httpGet:
+            path: /version
+            port: 1026
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: 500m
+            memory: 500Mi
+          requests:
+            cpu: 200m
+            memory: 200Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          seccompProfile:
+            type: docker/default
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fiware-orionld-service
+  namespace: custom-namespace
+spec:
+  ports:
+  - port: 1026
+    protocol: TCP
+    targetPort: 1026
+  selector:
+    app: orionlds
+  type: LoadBalancer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fiware-orionld-hpa
+spec:
+  maxReplicas: 10
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 30
+        type: Utilization
+    type: Resource
+  - resource:
+      name: memory
+      target:
+        averageUtilization: 70
+        type: Utilization
+    type: Resource
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fiware-orionld
+---
+apiVersion: v1
+data:
+  api-key: c2stMTIzNDU2Nzg5MGFiY2RlZg==
+  db-password: aGFyZGNvZGVkLXBhc3N3b3JkLTEyMw==
+kind: Secret
+metadata:
+  name: fiware-orionld-credentials
+type: Opaque

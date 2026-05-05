@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-gemma-deployment
+  namespace: custom-namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gemma-server
+  template:
+    metadata:
+      labels:
+        app: gemma-server
+    spec:
+      containers:
+      - args:
+        - python3 -m flask run --host=0.0.0.0 --port=8080
+        command:
+        - python3
+        - -c
+        env:
+        - name: MODEL_ID
+          value: mock-model-for-testing
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: hugging-face-hub-token
+              name: vllm-gemma-deployment-credentials
+        - valueFrom:
+            secretKeyRef:
+              key: admin-password
+              name: vllm-gemma-deployment-credentials
+        image: nginx@sha256:digest
+        imagePullPolicy: Always
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: inference-server
+        ports:
+        - containerPort:
+            containerPort: 9090
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: 150m
+            memory: 128Mi
+          requests:
+            cpu: 200m
+            memory: 256Mi
+        securityContext:
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /mnt/data
+          name:
+            emptyDir:
+              sizeLimit: 128Mi
+            name: dshm
+      containers[*]:
+        automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+      - emptyDir:
+          sizeLimit: 64Mi
+        name: dshm
+---
+apiVersion: v1
+data:
+  admin-password: YWRtaW4xMjMhQCM=
+  hugging-face-hub-token: aGZfaGFyZGNvZGVkX3Rva2VuX2FiYzEyM3h5eg==
+kind: Secret
+metadata:
+  name: vllm-gemma-deployment-credentials
+type: Opaque

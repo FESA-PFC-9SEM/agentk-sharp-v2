@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fiware-orionld
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: orionld
+  template:
+    metadata:
+      name: fiware-orion
+      labels:
+        app: orionld
+    spec:
+      containers:
+      - name: orion
+        image: fiware/orion-ld
+        resources:
+          requests:
+            cpu: "100m" 
+            memory: "100Mi" 
+          limits:
+            cpu: "500m" 
+            memory: "500Mi" 
+        args: ["-dbhost", "orionld-mongodb-svc:27017","-dbuser","usuariozao","-dbpwd","123456789","-dbAuthMech","SCRAM-SHA-256","-db","orion","-statCounters", "-statSemWait", "-statTiming", "-statNotifQueue"]
+        ports:
+        - containerPort: 1026
+        env:
+        - name: ORIONLD_MONGOCONLY
+          value: "TRUE"
+        - name: DB_PASSWORD
+          value: "hardcoded-password-123"
+        - name: API_KEY
+          value: "sk-1234567890abcdef"
+        livenessProbe:
+          httpGet:
+            path: /version
+            port: 1026
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /version
+            port: 1026
+          initialDelaySeconds: 5
+          periodSeconds: 5
